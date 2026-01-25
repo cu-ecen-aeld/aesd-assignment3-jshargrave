@@ -64,29 +64,32 @@ int main(int argc, char *argv[])
     }
 
     // Create and open file
-    int file_descriptor = open(argv[1], FILE_FLAGS, FILE_MODE);
+
+    char* writefile = argv[1];
+    char* writestr = argv[2];
+    int file_descriptor = open(writefile, FILE_FLAGS, FILE_MODE);
     
     // Check that file opened correctly
     if (file_descriptor == -1)
     {
-        print_and_log(LOG_ERR, "Error: Failed to open file '%s'!\n", argv[1]);
+        print_and_log(LOG_ERR, "Error: Failed to open file '%s'!\n", writefile);
         return 1;
     }
 
     // Log write
-    print_and_log2(LOG_DEBUG, "Writing '%s' to '%s'\n", argv[2], argv[1]);
+    print_and_log2(LOG_DEBUG, "Writing '%s' to '%s'\n", writestr, writefile);
 
     // Write contents to file
-    size_t write_length = strlen(argv[2]);
-    ssize_t bytes_written = write(file_descriptor, argv[2], write_length);
+    size_t write_length = strlen(writestr);
+    ssize_t bytes_written = write(file_descriptor, writestr, write_length);
     if (bytes_written == -1)
     {
-        print_and_log(LOG_ERR, "Error: Failed to write to file '%s'!\n", argv[1]);
+        print_and_log(LOG_ERR, "Error: Failed to write to file '%s'!\n", writefile);
         return 1;
     }
     else if (bytes_written != write_length)
     {
-        print_and_log(LOG_ERR, "Error: Failed to write all content to file '%s'!\n", argv[1]);
+        print_and_log(LOG_ERR, "Error: Failed to write all content to file '%s'!\n", writefile);
         return 1;
     }
 
@@ -94,7 +97,7 @@ int main(int argc, char *argv[])
     int close_return = close(file_descriptor);
     if (close_return == -1)
     {
-        print_and_log(LOG_ERR, "Error: Failed to close file '%s'!\n", argv[1]);
+        print_and_log(LOG_ERR, "Error: Failed to close file '%s'!\n", writefile);
         return 1;
     }
     
