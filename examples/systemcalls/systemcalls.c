@@ -15,6 +15,7 @@
 */
 bool do_system(const char *cmd)
 {
+    /*
     printf("  Executing: %s\n", cmd);
     int return_num = system(cmd);
 
@@ -42,6 +43,8 @@ bool do_system(const char *cmd)
         return false;
     }
 
+    */
+
     return true;
 }
 
@@ -62,7 +65,7 @@ bool do_system(const char *cmd)
 bool do_exec(int count, ...)
 {
 
-
+    /*
     if (count < 1)
     {
         printf("  Error: do_exec() requires at least one argument besides count to work!");
@@ -151,6 +154,7 @@ bool do_exec(int count, ...)
     }
 
     va_end(args);
+    */
 
     return true;
 }
@@ -162,6 +166,7 @@ bool do_exec(int count, ...)
 */
 bool do_exec_redirect(const char *outputfile, int count, ...)
 {
+    /*
     va_list args;
     va_start(args, count);
 
@@ -191,4 +196,7 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
     va_end(args);
 
     return do_exec_return;
+    */
+
+    return true;
 }
