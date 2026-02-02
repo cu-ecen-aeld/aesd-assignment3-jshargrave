@@ -12,10 +12,7 @@ BUSYBOX_VERSION=1_33_1
 FINDER_APP_DIR=$(realpath $(dirname $0))
 ARCH=arm64
 CROSS_COMPILE=aarch64-none-linux-gnu-
-TOOLCHAIN_LOCATION=/home/joe/aesd/toolchain/arm-gnu-toolchain/arm-gnu-toolchain-13.3.rel1-x86_64-aarch64-none-linux-gnu
-
-# PATH modifications
-export PATH="${TOOLCHAIN_LOCATION}/bin:${PATH}"
+SYSROOT="$(${CROSS_COMPILE}gcc -print-sysroot)"
 
 if [ $# -lt 1 ]
 then
@@ -92,7 +89,7 @@ ${CROSS_COMPILE}readelf -a bin/busybox | grep "Shared library"
 # Add library dependencies to rootfs
 interpreter=$(${CROSS_COMPILE}readelf -a bin/busybox | sed -n 's/.*program interpreter: \(.*\)]/\1/p')
 interpreter_base="$(basename "${interpreter}")"
-file=$(find "${TOOLCHAIN_LOCATION}" -name "${interpreter_base}" | head -n 1 || true)
+file=$(find "${SYSROOT}" -name "${interpreter_base}" | head -n 1 || true)
 
 if [ -z "${file}" ]; then
 
@@ -103,7 +100,7 @@ fi
 cp -a "${file}" "${OUTDIR}/rootfs/lib"
 
 for lib in $(${CROSS_COMPILE}readelf -a bin/busybox | sed -n 's/.*Shared library: \[\(.*\)]/\1/p'); do
-    file=$(find "${TOOLCHAIN_LOCATION}" -name "${lib}" | head -n 1 || true)
+    file=$(find "${SYSROOT}" -name "${lib}" | head -n 1 || true)
     if [ -z "${file}" ]; then
 
         echo "ERROR: Could not find ${lib} in toolchain"
