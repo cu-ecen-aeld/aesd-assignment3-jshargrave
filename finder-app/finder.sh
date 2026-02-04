@@ -1,3 +1,5 @@
+#!/bin/sh
+
 # If missing filesdir
 if [ $# -lt 1 ]
 then

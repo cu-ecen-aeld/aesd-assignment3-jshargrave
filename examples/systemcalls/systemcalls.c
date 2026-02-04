@@ -1,4 +1,10 @@
 #include "systemcalls.h"
+#include "fcntl.h"
+#include <sys/stat.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/wait.h>
+#include <sys/stat.h>
 
 /**
  * @param cmd the command to execute with system()
@@ -9,13 +15,36 @@
 */
 bool do_system(const char *cmd)
 {
+    int return_num = system(cmd);
 
-/*
- * TODO  add your code here
- *  Call the system() function with the command set in the cmd
- *   and return a boolean true if the system() call completed with success
- *   or false() if it returned a failure
-*/
+    if (cmd == NULL)
+    {
+        if (return_num == 0)
+        {
+            // No shell is available
+            return false; 
+        }
+    }
+    else if (return_num == -1)
+    {
+        // child process could not be created or its status could not be retrieved
+        return false; 
+    }
+    else if (!WIFEXITED(return_num))
+    {
+        // Shell should have exited
+        return false; 
+    }
+    else if (WEXITSTATUS(return_num) == 127)
+    {
+        // shell could not be executed in the child process
+        return false;
+    }
+    else if (WEXITSTATUS(return_num) != 0)
+    {
+        // cmd command returned non-zero
+        return false;
+    }
 
     return true;
 }
@@ -36,28 +65,72 @@ bool do_system(const char *cmd)
 
 bool do_exec(int count, ...)
 {
+    if (count < 1)
+    {
+        printf("  Error: do_exec() requires at least one argument besides count to work!");
+        return false;
+    }
+
     va_list args;
     va_start(args, count);
     char * command[count+1];
-    int i;
-    for(i=0; i<count; i++)
+    char * argument = NULL;
+    char * const* argv = NULL;
+    for(int i = 0; i < count; i++)
     {
-        command[i] = va_arg(args, char *);
+        argument = va_arg(args, char *);
+        if (i == 0 && argument[0] != '/')
+        {
+            printf("  Error: File '%s' is not expanded!\n", argument);
+            va_end(args);
+            return false;
+        }
+        command[i] = argument;
     }
     command[count] = NULL;
-    // this line is to avoid a compile warning before your implementation is complete
-    // and may be removed
-    command[count] = command[count];
+    argv = (char * const*) command;
 
-/*
- * TODO:
- *   Execute a system command by calling fork, execv(),
- *   and wait instead of system (see LSP page 161).
- *   Use the command[0] as the full path to the command to execute
- *   (first argument to execv), and use the remaining arguments
- *   as second argument to the execv() command.
- *
-*/
+    pid_t fork_pid = fork();
+    if (fork_pid == -1)
+    {
+        printf("  Error: Failed to create child proccess!\n");
+        va_end(args);
+        return false;
+    }
+    else if (fork_pid == 0)
+    {
+        // Child logic
+        int execv_return = execv(argv[0], argv);
+        if (execv_return == -1)
+        {
+            perror("execv");
+            _exit(127);
+        }
+    }
+    else
+    {
+        // Parent logic
+        int wstatus;
+        pid_t waitpid_return = waitpid(fork_pid, &wstatus, 0);
+        if (waitpid_return == -1)
+        {
+            printf("  Error: Failed to wait for child %d!", fork_pid);
+            va_end(args);
+            return false;
+        }
+        else if (!WIFEXITED(wstatus))
+        {
+            printf("  Error: Child process did not exit normally\n");
+            va_end(args);
+            return false;
+        }
+        else if (WEXITSTATUS(wstatus) != 0)
+        {
+            printf("  Error: Child process did not return 0\n");
+            va_end(args);
+            return false;
+        }
+    }
 
     va_end(args);
 
@@ -71,28 +144,99 @@ bool do_exec(int count, ...)
 */
 bool do_exec_redirect(const char *outputfile, int count, ...)
 {
+    if (count < 1)
+    {
+        printf("  Error: do_exec() requires at least one argument besides count to work!");
+        return false;
+    }
+
     va_list args;
     va_start(args, count);
     char * command[count+1];
-    int i;
-    for(i=0; i<count; i++)
+    char * argument = NULL;
+    char * const* argv = NULL;
+    for(int i = 0; i < count; i++)
     {
-        command[i] = va_arg(args, char *);
+        argument = va_arg(args, char *);
+
+        if (argument == NULL)
+        {
+            printf("  Error: count '%d' was not populated correctly!\n", count);
+            va_end(args);
+            return false;
+        }
+        else if (i == 0 && argument[0] != '/')
+        {
+            printf("  Error: File '%s' is not expanded!\n", argument);
+            va_end(args);
+            return false;
+        }
+        command[i] = argument;
     }
     command[count] = NULL;
-    // this line is to avoid a compile warning before your implementation is complete
-    // and may be removed
-    command[count] = command[count];
+    argv = (char * const*) command;
 
+    pid_t fork_pid = fork();
+    if (fork_pid == -1)
+    {
+        printf("  Error: Failed to create child proccess!\n");
+        va_end(args);
+        return false;
+    }
+    else if (fork_pid == 0)
+    {
+        // Child logic
+        int fd = open(outputfile, O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+        if (fd == -1)
+        {
+            _exit(127);
+        }
 
-/*
- * TODO
- *   Call execv, but first using https://stackoverflow.com/a/13784315/1446624 as a refernce,
- *   redirect standard out to a file specified by outputfile.
- *   The rest of the behaviour is same as do_exec()
- *
-*/
+        int dup_return = dup2(fd, STDOUT_FILENO);
+        if (dup_return == -1)
+        {
+            close(fd);
+            _exit(127);
+        }
 
+        int close_return = close(fd);
+        if (close_return == -1)
+        {
+            _exit(127);
+        }
+
+        int execv_return = execv(argv[0], argv);
+        if (execv_return == -1)
+        {
+            perror("execv");
+            _exit(127);
+        }
+    }
+    else
+    {
+        // Parent logic
+        int wstatus;
+        pid_t waitpid_return = waitpid(fork_pid, &wstatus, 0);
+        if (waitpid_return == -1)
+        {
+            printf("  Error: Failed to wait for child %d!", fork_pid);
+            va_end(args);
+            return false;
+        }
+        else if (!WIFEXITED(wstatus))
+        {
+            printf("  Error: Child process did not exit normally\n");
+            va_end(args);
+            return false;
+        }
+        else if (WEXITSTATUS(wstatus) != 0)
+        {
+            printf("  Error: Child process did not return 0\n");
+            va_end(args);
+            return false;
+        }
+    }
+    
     va_end(args);
 
     return true;
